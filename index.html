@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scanner QR - The Club</title>
+    <script src="https://cdn.jsdelivr.net/npm/html5-qrcode/minified/html5-qrcode.min.js"></script>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js"></script>
+    <style>
+        :root {
+            --color-cream-50: rgba(252, 252, 249, 1);
+            --color-cream-100: rgba(255, 255, 253, 1);
+            --color-slate-900: rgba(19, 52, 59, 1);
+            --color-slate-500: rgba(98, 108, 113, 1);
+            --color-teal-500: rgba(33, 128, 141, 1);
+            --color-teal-600: rgba(29, 116, 128, 1);
+            --color-red-500: rgba(192, 21, 47, 1);
+            --color-green-500: rgba(34, 197, 94, 1);
+            --color-yellow-500: rgba(234, 179, 8, 1);
+            --color-background: var(--color-cream-50);
+            --color-surface: var(--color-cream-100);
+            --color-text: var(--color-slate-900);
+            --color-text-secondary: var(--color-slate-500);
+            --color-primary: var(--color-teal-500);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --color-background: rgba(31, 33, 33, 1);
+                --color-surface: rgba(38, 40, 40, 1);
+                --color-text: rgba(245, 245, 245, 1);
+                --color-text-secondary: rgba(167, 169, 169, 0.7);
+                --color-primary: rgba(50, 184, 198, 1);
+                --color-green-500: rgba(34, 197, 94, 1);
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background-color: var(--color-background);
+            color: var(--color-text);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background-color: var(--color-surface);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .logo {
+            flex-shrink: 0;
+        }
+
+        .logo img {
+            max-width: 80px;
+            height: auto;
+        }
+
+        .header-text h1 {
+            font-size: 24px;
+            color: var(--color-primary);
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            color: var(--color-text-secondary);
+            font-size: 14px;
+        }
+
+        .scanner-section {
+            background-color: var(--color-surface);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        #qr-reader {
+            width: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+            max-height: 400px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            flex: 1;
+            min-width: 140px;
+            padding: 12px;
+            background-color: var(--color-primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--color-teal-600);
+        }
+
+        button.danger {
+            background-color: var(--color-red-500);
+        }
+
+        button.danger:hover {
+            background-color: rgba(192, 21, 47, 0.8);
+        }
+
+        .results-section {
+            background-color: var(--color-surface);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        h2 {
+            font-size: 20px;
+            margin-bottom: 15px;
+            color: var(--color-primary);
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background-color: var(--color-background);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            border: 2px solid var(--color-primary);
+        }
+
+        .stat-number {
+            font-size: 36px;
+            font-weight: bold;
+            color: var(--color-primary);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--color-text-secondary);
+            margin-top: 8px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .consumed-list {
+            list-style: none;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .consumed-item {
+            background-color: var(--color-background);
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 5px solid var(--color-green-500);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .consumed-item:hover {
+            background-color: rgba(50, 184, 198, 0.05);
+        }
+
+        .consumed-item.expanded {
+            background-color: rgba(34, 197, 94, 0.1);
+        }
+
+        .consumed-info {
+            flex-grow: 1;
+        }
+
+        .consumed-name {
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .consumed-details {
+            display: none;
+            font-size: 12px;
+            color: var(--color-text-secondary);
+            margin-top: 8px;
+        }
+
+        .consumed-item.expanded .consumed-details {
+            display: block;
+        }
+
+        .consumed-status {
+            font-size: 12px;
+            color: var(--color-green-500);
+            background-color: rgba(34, 197, 94, 0.15);
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .message {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            text-align: center;
+            font-weight: 500;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .success {
+            background-color: rgba(34, 197, 94, 0.15);
+            color: var(--color-green-500);
+            border: 2px solid var(--color-green-500);
+        }
+
+        .error {
+            background-color: rgba(192, 21, 47, 0.15);
+            color: var(--color-red-500);
+            border: 2px solid var(--color-red-500);
+        }
+
+        .warning {
+            background-color: rgba(234, 179, 8, 0.15);
+            color: #b45309;
+            border: 2px solid #b45309;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.4);
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: var(--color-surface);
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .modal-content h3 {
+            margin-bottom: 15px;
+            color: var(--color-primary);
+            font-size: 22px;
+        }
+
+        .modal-content p {
+            margin-bottom: 20px;
+            color: var(--color-text-secondary);
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .modal-buttons button {
+            flex: 1;
+        }
+
+        .modal-buttons .cancel {
+            background-color: var(--color-text-secondary);
+        }
+
+        .modal-buttons .cancel:hover {
+            background-color: rgba(98, 108, 113, 0.8);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--color-text-secondary);
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .stats {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .stat-number {
+                font-size: 28px;
+            }
+
+            button {
+                min-width: 100px;
+                font-size: 12px;
+                padding: 10px;
+            }
+
+            .consumed-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .consumed-status {
+                margin-top: 10px;
+                align-self: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">
+                <img src="https://raw.githubusercontent.com/dontstopeventssss/DONTSTOP-SHOT-OMAGGIO/main/THE-CLUB-logo.jpg.png" alt="The Club Logo">
+            </div>
+            <div class="header-text">
+                <h1>Scanner QR - Shot Omaggio</h1>
+                <p class="subtitle">Bartender: scansiona i QR code per registrare gli shot riscattati</p>
+            </div>
+        </div>
+
+        <div class="scanner-section">
+            <div id="qr-reader"></div>
+            <div class="controls">
+                <button id="startBtn">▶️ Avvia Scanner</button>
+                <button id="stopBtn">⏹️ Ferma Scanner</button>
+                <button id="refreshBtn">🔄 Aggiorna Dati</button>
+                <button class="danger" id="resetBtn">🗑️ Reset Tutto</button>
+            </div>
+        </div>
+
+        <div id="message"></div>
+
+        <div class="results-section">
+            <h2>📊 Statistiche</h2>
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-number" id="totalCount">0</div>
+                    <div class="stat-label">QR Validi</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="scannedCount">0</div>
+                    <div class="stat-label">QR Scansionati</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="remainingCount">0</div>
+                    <div class="stat-label">QR Rimanenti</div>
+                </div>
+            </div>
+
+            <h2>✅ Shot Riscattati</h2>
+            <ul class="consumed-list" id="consumedList">
+                <div class="empty-state">
+                    <div class="empty-state-icon">🍹</div>
+                    <p>Nessuno shot riscattato ancora...</p>
+                </div>
+            </ul>
+        </div>
+    </div>
+
+    <div class="modal" id="resetModal">
+        <div class="modal-content">
+            <h3>⚠️ Attenzione</h3>
+            <p>Stai per eliminare TUTTI i dati salvati. Questa azione è irreversibile. Sei sicuro?</p>
+            <div class="modal-buttons">
+                <button class="cancel" onclick="closeResetModal()">Annulla</button>
+                <button class="danger" onclick="confirmReset()">Sì, Elimina Tutto</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyAosi73Ula5jEoMOBJIngIjW791d2p2mVQ",
+            authDomain: "dontstop-shot-omaggio.firebaseapp.com",
+            databaseURL: "https://dontstop-shot-omaggio-default-rtdb.europe-west1.firebasedatabase.app/",
+            projectId: "dontstop-shot-omaggio",
+            storageBucket: "dontstop-shot-omaggio.firebasestorage.app",
+            messagingSenderId: "233471466990",
+            appId: "1:233471466990:web:7a5c044857e87b900202ff",
+            measurementId: "G-KVDYLBCFQ5"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        let scanner = null;
+        const messageDiv = document.getElementById('message');
+        const resetModal = document.getElementById('resetModal');
+        let lastScannedQrId = null;
+
+        // Inizializza lo scanner
+        function initScanner() {
+            scanner = new Html5Qrcode("qr-reader");
+        }
+
+        // Avvia lo scanner
+        document.getElementById('startBtn').addEventListener('click', () => {
+            if (!scanner) initScanner();
+
+            scanner.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 250, height: 250 } },
+                onScanSuccess,
+                onScanError
+            );
+        });
+
+        // Ferma lo scanner
+        document.getElementById('stopBtn').addEventListener('click', () => {
+            if (scanner) {
+                scanner.stop();
+            }
+        });
+
+        // Aggiorna dati
+        document.getElementById('refreshBtn').addEventListener('click', () => {
+            updateStats();
+        });
+
+        // Reset button
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            resetModal.classList.add('active');
+        });
+
+        function closeResetModal() {
+            resetModal.classList.remove('active');
+        }
+
+        function confirmReset() {
+            database.ref('iscritti').remove().then(() => {
+                showMessage('✅ Tutti i dati sono stati eliminati', 'success');
+                resetModal.classList.remove('active');
+                updateStats();
+            }).catch((error) => {
+                showMessage('❌ Errore: ' + error.message, 'error');
+            });
+        }
+
+        // Gestisci il QR code scannerizzato
+        function onScanSuccess(decodedText) {
+            const qrId = decodedText.trim();
+
+            // Evita doppia lettura dello stesso QR
+            if (lastScannedQrId === qrId) {
+                return;
+            }
+            lastScannedQrId = qrId;
+
+            database.ref(`iscritti/${qrId}`).once('value').then((snapshot) => {
+                if (snapshot.exists()) {
+                    const user = snapshot.val();
+
+                    if (user.utilizzato) {
+                        showMessage(`⚠️ ${user.nome} ${user.cognome} ha già usato lo shot!`, 'warning');
+                    } else {
+                        // Segna come utilizzato
+                        database.ref(`iscritti/${qrId}`).update({ utilizzato: true }).then(() => {
+                            showMessage(`✅ Shot riscattato per ${user.nome} ${user.cognome}!`, 'success');
+                            updateStats();
+                        });
+                    }
+                } else {
+                    showMessage('❌ QR code non valido', 'error');
+                }
+            }).finally(() => {
+                setTimeout(() => {
+                    lastScannedQrId = null;
+                }, 1000);
+            });
+        }
+
+        function onScanError(error) {
+            // Ignora gli errori di scansione normali
+        }
+
+        // Aggiorna le statistiche
+        function updateStats() {
+            database.ref('iscritti').once('value').then((snapshot) => {
+                let total = 0;
+                let scanned = 0;
+                const scannedUsers = [];
+
+                if (snapshot.exists()) {
+                    const data = snapshot.val();
+                    total = Object.keys(data).length;
+
+                    Object.values(data).forEach((user) => {
+                        if (user.utilizzato) {
+                            scanned++;
+                            scannedUsers.push(user);
+                        }
+                    });
+                }
+
+                // Aggiorna i numeri
+                document.getElementById('totalCount').textContent = total;
+                document.getElementById('scannedCount').textContent = scanned;
+                document.getElementById('remainingCount').textContent = total - scanned;
+
+                // Aggiorna la lista
+                const consumedList = document.getElementById('consumedList');
+                if (scannedUsers.length === 0) {
+                    consumedList.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🍹</div>
+                            <p>Nessuno shot riscattato ancora...</p>
+                        </div>
+                    `;
+                } else {
+                    consumedList.innerHTML = scannedUsers.map((user, index) => `
+                        <li class="consumed-item" onclick="this.classList.toggle('expanded')">
+                            <div class="consumed-info">
+                                <div class="consumed-name">#${index + 1} - ${user.nome} ${user.cognome}</div>
+                                <div class="consumed-details">
+                                    QR ID: ${user.qrId}<br>
+                                    Scadenza: ${new Date(user.scadenza).toLocaleString('it-IT')}
+                                </div>
+                            </div>
+                            <span class="consumed-status">✓ Riscattato</span>
+                        </li>
+                    `).join('');
+                }
+            });
+        }
+
+        function showMessage(text, type) {
+            messageDiv.innerHTML = `<div class="message ${type}">${text}</div>`;
+            setTimeout(() => {
+                messageDiv.innerHTML = '';
+            }, 4000);
+        }
+
+        // Carica i dati all'avvio
+        updateStats();
+    </script>
+</body>
+</html>
