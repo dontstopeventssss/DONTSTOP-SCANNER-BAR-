@@ -124,20 +124,6 @@
             margin-bottom: 5px;
         }
 
-        .result-details {
-            font-size: 12px;
-            opacity: 0.8;
-            margin-top: 10px;
-        }
-
-        .guest-info {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 10px;
-            border-radius: 4px;
-            margin-top: 10px;
-            font-size: 14px;
-        }
-
         .loading {
             text-align: center;
             color: #00d4ff;
@@ -182,10 +168,6 @@
         @keyframes pulse {
             0%, 100% { transform: scale(1); }
             50% { transform: scale(1.05); }
-        }
-
-        .hidden {
-            display: none;
         }
     </style>
 </head>
@@ -247,7 +229,7 @@
         let scanner = null;
         let isScanning = true;
         let lastScanTime = 0;
-        const SCAN_COOLDOWN = 2000; // 2 secondi tra una scansione e l'altra
+        const SCAN_COOLDOWN = 2000;
 
         // ===== INIZIALIZZA SCANNER =====
         async function initScanner() {
@@ -263,7 +245,7 @@
                     onScanError
                 );
             } catch (error) {
-                console.error('Errore nell\'inizializzazione dello scanner:', error);
+                console.error('Errore scanner:', error);
                 showResult('❌ Errore', 'Impossibile accedere alla fotocamera', 'error');
             }
         }
@@ -278,7 +260,6 @@
             lastScanTime = now;
             isScanning = false;
 
-            // Estrai il token dall'URL
             let token = extractToken(decodedText);
 
             if (!token) {
@@ -287,10 +268,8 @@
                 return;
             }
 
-            // Mostra loading
             document.getElementById('loading').style.display = 'block';
 
-            // Controlla se la promo è scaduta
             const now_time = new Date().getTime();
             if (now_time >= DEADLINE) {
                 showResult('⏰ Scaduto', 'La promo è scaduta', 'warning');
@@ -299,7 +278,6 @@
                 return;
             }
 
-            // Cerca il guest nel database
             const { data, error } = await supabase
                 .from('guests')
                 .select('*')
@@ -314,7 +292,6 @@
                 return;
             }
 
-            // Controlla se già riscattato
             if (data.redeemed_at) {
                 showResult(
                     '⚠️ Già usato',
@@ -325,7 +302,6 @@
                 return;
             }
 
-            // Riscatta il QR
             const { error: updateError } = await supabase
                 .from('guests')
                 .update({ redeemed_at: new Date() })
@@ -337,17 +313,13 @@
                 return;
             }
 
-            // Successo!
             showResult(
                 '✅ OK!',
                 `${data.first_name} ${data.last_name}\nShot omaggio riscattato`,
                 'success'
             );
 
-            // Aggiorna contatori
             updateCounters();
-
-            // Reset
             resetScanner();
         }
 
@@ -363,7 +335,6 @@
                 const token = urlObj.searchParams.get('token');
                 return token || null;
             } catch {
-                // Potrebbe essere solo il token
                 const match = url.match(/token=([a-z0-9]+)/i);
                 return match ? match[1] : null;
             }
@@ -390,7 +361,7 @@
             }, 2000);
         }
 
-        // ===== AGGIORNA CONTATORI =====
+        // ===== AGGIORNA CONTATORI (CON REAL-TIME) =====
         async function updateCounters() {
             const { data: allGuests, error: errorAll } = await supabase
                 .from('guests')
@@ -410,10 +381,31 @@
             document.getElementById('availableCount').textContent = Math.max(0, available);
         }
 
+        // ===== ASCOLTA CAMBIAMENTI IN TEMPO REALE =====
+        function setupRealtimeListener() {
+            const subscription = supabase
+                .channel('guests_changes')
+                .on(
+                    'postgres_changes',
+                    {
+                        event: '*',
+                        schema: 'public',
+                        table: 'guests'
+                    },
+                    (payload) => {
+                        console.log('Cambio rilevato:', payload);
+                        updateCounters();
+                    }
+                )
+                .subscribe((status) => {
+                    console.log('Stato della sottoscrizione:', status);
+                });
+        }
+
         // ===== INIT =====
         initScanner();
         updateCounters();
-        setInterval(updateCounters, 10000); // Aggiorna contatori ogni 10 secondi
+        setupRealtimeListener();
     </script>
 </body>
 </html>
