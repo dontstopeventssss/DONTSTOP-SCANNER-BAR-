@@ -27,6 +27,14 @@
         .header {
             text-align: center;
             margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-title {
+            flex: 1;
+            text-align: center;
         }
 
         h1 {
@@ -37,6 +45,27 @@
         .subtitle {
             color: #aaa;
             font-size: 14px;
+        }
+
+        .delete-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: background 0.3s;
+            white-space: nowrap;
+        }
+
+        .delete-btn:hover {
+            background: #c0392b;
+        }
+
+        .delete-btn:active {
+            transform: scale(0.95);
         }
 
         .stats {
@@ -169,13 +198,88 @@
             0%, 100% { transform: scale(1); }
             50% { transform: scale(1.05); }
         }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #1a1a2e;
+            border: 2px solid #e74c3c;
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .modal-content h2 {
+            color: #e74c3c;
+            margin-bottom: 15px;
+            font-size: 24px;
+        }
+
+        .modal-content p {
+            color: #aaa;
+            margin-bottom: 20px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .modal-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .modal-btn.confirm {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .modal-btn.confirm:hover {
+            background: #c0392b;
+        }
+
+        .modal-btn.cancel {
+            background: #16213e;
+            color: #aaa;
+            border: 1px solid #0f3460;
+        }
+
+        .modal-btn.cancel:hover {
+            background: #0f3460;
+            color: white;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🍺 Bar Scanner</h1>
-            <p class="subtitle">Scansiona i QR per gli shot omaggio</p>
+            <div class="header-title">
+                <h1>🍺 Bar Scanner</h1>
+                <p class="subtitle">Scansiona i QR per gli shot omaggio</p>
+            </div>
+            <button class="delete-btn" id="deleteAllBtn">🗑️ RESET TEST</button>
         </div>
 
         <div class="instructions">
@@ -212,6 +316,20 @@
         </div>
     </div>
 
+    <!-- Modal Conferma -->
+    <div class="modal" id="deleteModal">
+        <div class="modal-content">
+            <h2>⚠️ ATTENZIONE!</h2>
+            <p>Stai per eliminare TUTTE le registrazioni.<br>
+            Questa azione non può essere annullata!<br>
+            Continua?</p>
+            <div class="modal-buttons">
+                <button class="modal-btn confirm" id="confirmDeleteBtn">Sì, elimina tutto</button>
+                <button class="modal-btn cancel" id="cancelDeleteBtn">Annulla</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Supabase JS -->
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <!-- html5-qrcode per lo scanner -->
@@ -222,7 +340,7 @@
         const SUPABASE_URL = 'https://wbefrliejekbipxuvckn.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_HGOihe5zJfYg4_s8d6cMbQ_Awpi4PLz';
         const MAX_GUESTS = 50;
-        const DEADLINE = new Date('2024-12-06T00:00:00').getTime();
+        const DEADLINE = new Date('2025-12-06T00:00:00').getTime();
 
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -230,6 +348,34 @@
         let isScanning = true;
         let lastScanTime = 0;
         const SCAN_COOLDOWN = 2000;
+
+        // ===== DELETE ALL GUESTS =====
+        async function deleteAllGuests() {
+            try {
+                const { error } = await supabase.from('guests').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+                
+                if (error) {
+                    showResult('❌ Errore', 'Errore nella cancellazione', 'error');
+                    return;
+                }
+
+                showResult('✅ Fatto!', 'Tutte le registrazioni sono state eliminate', 'success');
+                updateCounters();
+                closeModal();
+            } catch (err) {
+                console.error('Errore:', err);
+                showResult('❌ Errore', err.message, 'error');
+            }
+        }
+
+        // ===== MODAL FUNCTIONS =====
+        function openModal() {
+            document.getElementById('deleteModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('deleteModal').classList.remove('active');
+        }
 
         // ===== INIZIALIZZA SCANNER =====
         async function initScanner() {
@@ -335,7 +481,7 @@
                 const token = urlObj.searchParams.get('token');
                 return token || null;
             } catch {
-                const match = url.match(/token=([a-z0-9]+)/i);
+                const match = url.match(/token=([a-zA-Z0-9]+)/i);
                 return match ? match[1] : null;
             }
         }
@@ -361,7 +507,7 @@
             }, 2000);
         }
 
-        // ===== AGGIORNA CONTATORI (CON REAL-TIME) =====
+        // ===== AGGIORNA CONTATORI =====
         async function updateCounters() {
             const { data: allGuests, error: errorAll } = await supabase
                 .from('guests')
@@ -401,6 +547,18 @@
                     console.log('Stato della sottoscrizione:', status);
                 });
         }
+
+        // ===== EVENT LISTENERS =====
+        document.getElementById('deleteAllBtn').addEventListener('click', openModal);
+        document.getElementById('confirmDeleteBtn').addEventListener('click', deleteAllGuests);
+        document.getElementById('cancelDeleteBtn').addEventListener('click', closeModal);
+
+        // Chiudi modal cliccando fuori
+        document.getElementById('deleteModal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('deleteModal')) {
+                closeModal();
+            }
+        });
 
         // ===== INIT =====
         initScanner();
