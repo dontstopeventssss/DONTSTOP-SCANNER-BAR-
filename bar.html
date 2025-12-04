@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bar Scanner - Shot Omaggio</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: white;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 32px;
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            color: #aaa;
+            font-size: 14px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .stat-box {
+            background: #16213e;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            border: 2px solid #0f3460;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #aaa;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-value {
+            font-size: 36px;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+
+        .scanner-container {
+            background: #16213e;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            border: 2px solid #0f3460;
+        }
+
+        #qr-reader {
+            width: 100%;
+            min-height: 400px;
+            background: #0a0e27;
+        }
+
+        .result-box {
+            background: #16213e;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 2px solid #0f3460;
+            min-height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        .result-box.success {
+            background: #0d3b1f;
+            border-color: #2ecc71;
+            color: #2ecc71;
+        }
+
+        .result-box.error {
+            background: #3b0d0d;
+            border-color: #e74c3c;
+            color: #e74c3c;
+        }
+
+        .result-box.warning {
+            background: #3b2d0d;
+            border-color: #f39c12;
+            color: #f39c12;
+        }
+
+        .result-icon {
+            font-size: 40px;
+            margin-bottom: 10px;
+        }
+
+        .result-text {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .result-details {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-top: 10px;
+        }
+
+        .guest-info {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+
+        .loading {
+            text-align: center;
+            color: #00d4ff;
+            font-weight: 600;
+        }
+
+        .spinner {
+            border: 3px solid rgba(0, 212, 255, 0.2);
+            border-top: 3px solid #00d4ff;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .instructions {
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid #00d4ff;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .instructions strong {
+            color: #00d4ff;
+        }
+
+        .pulse {
+            animation: pulse 0.5s ease-in-out;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🍺 Bar Scanner</h1>
+            <p class="subtitle">Scansiona i QR per gli shot omaggio</p>
+        </div>
+
+        <div class="instructions">
+            <strong>Come funziona:</strong><br>
+            1. Posiziona il telefono/tablet del cliente di fronte al lettore<br>
+            2. Il QR viene scansionato automaticamente<br>
+            3. Attendi il feedback (verde = OK, rosso = errore)
+        </div>
+
+        <div class="stats">
+            <div class="stat-box">
+                <div class="stat-label">Iscritti</div>
+                <div class="stat-value" id="totalGuests">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Riscossi</div>
+                <div class="stat-value" id="redeemedCount">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Disponibili</div>
+                <div class="stat-value" id="availableCount">50</div>
+            </div>
+        </div>
+
+        <div class="result-box" id="resultBox" style="display: none;"></div>
+
+        <div class="scanner-container">
+            <div id="qr-reader"></div>
+        </div>
+
+        <div class="loading" id="loading" style="display: none;">
+            <div class="spinner"></div>
+            Verificando QR...
+        </div>
+    </div>
+
+    <!-- Supabase JS -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <!-- html5-qrcode per lo scanner -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+
+    <script>
+        // ===== CONFIGURAZIONE =====
+        const SUPABASE_URL = 'https://wbefrliejekbipxuvckn.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_HGOihe5zJfYg4_s8d6cMbQ_Awpi4PLz';
+        const MAX_GUESTS = 50;
+        const DEADLINE = new Date('2024-12-06T00:00:00').getTime();
+
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let scanner = null;
+        let isScanning = true;
+        let lastScanTime = 0;
+        const SCAN_COOLDOWN = 2000; // 2 secondi tra una scansione e l'altra
+
+        // ===== INIZIALIZZA SCANNER =====
+        async function initScanner() {
+            try {
+                scanner = new Html5Qrcode('qr-reader');
+                await scanner.start(
+                    { facingMode: 'environment' },
+                    {
+                        fps: 10,
+                        qrbox: { width: 250, height: 250 }
+                    },
+                    onScanSuccess,
+                    onScanError
+                );
+            } catch (error) {
+                console.error('Errore nell\'inizializzazione dello scanner:', error);
+                showResult('❌ Errore', 'Impossibile accedere alla fotocamera', 'error');
+            }
+        }
+
+        // ===== CALLBACK SCANSIONE RIUSCITA =====
+        async function onScanSuccess(decodedText) {
+            if (!isScanning) return;
+
+            const now = Date.now();
+            if (now - lastScanTime < SCAN_COOLDOWN) return;
+
+            lastScanTime = now;
+            isScanning = false;
+
+            // Estrai il token dall'URL
+            let token = extractToken(decodedText);
+
+            if (!token) {
+                showResult('❌ Errore', 'QR non valido', 'error');
+                resetScanner();
+                return;
+            }
+
+            // Mostra loading
+            document.getElementById('loading').style.display = 'block';
+
+            // Controlla se la promo è scaduta
+            const now_time = new Date().getTime();
+            if (now_time >= DEADLINE) {
+                showResult('⏰ Scaduto', 'La promo è scaduta', 'warning');
+                document.getElementById('loading').style.display = 'none';
+                resetScanner();
+                return;
+            }
+
+            // Cerca il guest nel database
+            const { data, error } = await supabase
+                .from('guests')
+                .select('*')
+                .eq('qr_token', token)
+                .single();
+
+            document.getElementById('loading').style.display = 'none';
+
+            if (error || !data) {
+                showResult('❌ Non trovato', 'QR non valido', 'error');
+                resetScanner();
+                return;
+            }
+
+            // Controlla se già riscattato
+            if (data.redeemed_at) {
+                showResult(
+                    '⚠️ Già usato',
+                    `${data.first_name} ${data.last_name}\nHa già ricevuto lo shot`,
+                    'error'
+                );
+                resetScanner();
+                return;
+            }
+
+            // Riscatta il QR
+            const { error: updateError } = await supabase
+                .from('guests')
+                .update({ redeemed_at: new Date() })
+                .eq('id', data.id);
+
+            if (updateError) {
+                showResult('❌ Errore', 'Errore nel salvataggio', 'error');
+                resetScanner();
+                return;
+            }
+
+            // Successo!
+            showResult(
+                '✅ OK!',
+                `${data.first_name} ${data.last_name}\nShot omaggio riscattato`,
+                'success'
+            );
+
+            // Aggiorna contatori
+            updateCounters();
+
+            // Reset
+            resetScanner();
+        }
+
+        // ===== CALLBACK ERRORE SCANSIONE =====
+        function onScanError(error) {
+            // Ignora errori di scansione normali
+        }
+
+        // ===== ESTRAI TOKEN DALL'URL =====
+        function extractToken(url) {
+            try {
+                const urlObj = new URL(url);
+                const token = urlObj.searchParams.get('token');
+                return token || null;
+            } catch {
+                // Potrebbe essere solo il token
+                const match = url.match(/token=([a-z0-9]+)/i);
+                return match ? match[1] : null;
+            }
+        }
+
+        // ===== MOSTRA RISULTATO =====
+        function showResult(icon, text, type) {
+            const resultBox = document.getElementById('resultBox');
+            resultBox.className = `result-box ${type} pulse`;
+            resultBox.innerHTML = `
+                <div>
+                    <div class="result-icon">${icon}</div>
+                    <div class="result-text">${text}</div>
+                </div>
+            `;
+            resultBox.style.display = 'flex';
+        }
+
+        // ===== RESET SCANNER =====
+        async function resetScanner() {
+            setTimeout(async () => {
+                document.getElementById('resultBox').style.display = 'none';
+                isScanning = true;
+            }, 2000);
+        }
+
+        // ===== AGGIORNA CONTATORI =====
+        async function updateCounters() {
+            const { data: allGuests, error: errorAll } = await supabase
+                .from('guests')
+                .select('*');
+
+            if (errorAll) {
+                console.error('Errore nel caricamento:', errorAll);
+                return;
+            }
+
+            const total = allGuests?.length || 0;
+            const redeemed = allGuests?.filter(g => g.redeemed_at).length || 0;
+            const available = MAX_GUESTS - redeemed;
+
+            document.getElementById('totalGuests').textContent = total;
+            document.getElementById('redeemedCount').textContent = redeemed;
+            document.getElementById('availableCount').textContent = Math.max(0, available);
+        }
+
+        // ===== INIT =====
+        initScanner();
+        updateCounters();
+        setInterval(updateCounters, 10000); // Aggiorna contatori ogni 10 secondi
+    </script>
+</body>
+</html>
